@@ -158,11 +158,12 @@ print_loop_cond:
 # a1 - size of the array, `n`
 # a2 - exp, the maximum power of RADIX (10) less than the largest element (i.e. 1000 if largest is 1500)
 .globl radsort
-radsort: 
+radsort:
     # ---------- Set up Stack Frame ----------
     # Stack Frame Size: 32
-    addiu $sp, $sp, -60 # Move stack pointer to allocate space
+    addiu $sp, $sp, -100 # Move stack pointer to allocate space
     sw $ra, 28($sp)     # Since we'll be making function calls, save $ra at the top of s.f.
+
     # NOTE: Don't think we need to save arguments a0-a2 becuase don't use original values after recursive call
 
     # ---------- Base Case ----------
@@ -183,9 +184,6 @@ radsort:
     # t5 - sp + 20 - address of children_len
     # t6 - sp + 24 - RADIX
     # ra - sp + 28 - return address
-    # t7 - i/loop variable for all loops
-    # t8 - condition variable for slt
-    # t9 - 
     move    $t0, $a0
     sw      $t0, ($sp) 
     move    $t1, $a1
@@ -219,9 +217,12 @@ radsort:
     # t3 is RADIX
     # t4 addr of children + offset
     # t5 is branch indic
-    move    $t0 $zero
-    lw      $t2 16($sp)
-    lw      $t3 24($sp)
+    # move $t9, $ra
+    # jal print
+    # move $ra, $t9
+    # move $t9, $ra
+    # jal print
+    # move $ra, $t9
     j       bucket_init_test
 
 bucket_init_body: 
@@ -281,10 +282,7 @@ bucket_assign_body:
     sll     $t4, $t8, 2             # t4 = sort_index << 2 = sort_index * 4
     add     $t4, $t6, $t4           # t4 = &children_len + sort_index
     lw      $t4, ($t4)              # t4 = children_len[sort_index]
-    # move $t9, $ra
-    # jal print
-    # move $ra, $t9
-    beq $t4, 0, empty_child_len # beq arr[i] == 0, empty_children_len_if
+    beq $t4, 0, empty_child_len     # beq arr[i] == 0, empty_children_len_if
 
 non_empty_child_len:
     sll     $t1, $t8, 2             # t1 = sort_index << 2 = sort_index * 4
@@ -328,33 +326,67 @@ bucket_assign_test:
     j rad_test
 
 recurse_rad_sort:
-#radsort(children[i], children_len[i], exp/RADIX);
+    sll     $t5, $t0, 2             # t5 = i << 2 = i * 4
+    add     $t5, $t5, $t3           # t5 = &(children + t5)
+    lw      $t5, ($t5)              # t5 = children[i]
+    move    $a0, $t5                # arg 0 = children[i]
+    sll     $t4, $t0, 2             # t4 = i * 4
+    add     $t4, $t2, $t4           # t4 = children_len + i
+    lw      $t4, ($t4)              # t4 = children_len[i]
+    move    $a1, $t4                # arg 1 = children_len[i]
+    lw      $t4, 8($sp)             # t4 = exp
+    lw      $t5, 24($sp)            # t5 = RADIX
+    divu    $t4, $t5                # t1 = exp / RADIX
+    mfhi    $t4                     # t4 is quotient
+    move    $a2, $t4                # arg 2 = exp/RAD
+    sw   $t0, 32($sp)
+    sw   $t1, 36($sp)
+    sw   $t2, 40($sp)
+    sw   $t3, 44($sp)
+    sw   $t4, 48($sp)
+    sw   $t5, 52($sp)
+    sw   $t6, 56($sp)
+    sw   $t7, 60($sp)
+    sw   $t8, 64($sp)
+    jal     radsort                 #radsort(children[i], children_len[i], exp/RADIX);
+    lw   $t0, 32($sp)
+    lw   $t1, 36($sp)
+    lw   $t2, 40($sp)
+    lw   $t3, 44($sp)
+    lw   $t4, 48($sp)
+    lw   $t5, 52($sp)
+    lw   $t6, 56($sp)
+    lw   $t7, 60($sp)
+    lw   $t8, 64($sp)
     j       copy_array_jump
 
 copy_array_body:    
     sll     $t8, $t6, 2             # t8 = i2 << 2 = i2 * 4
     add     $t4, $t7, $t1           # dst = array + idx
-    add     $t8, $t4, $t8           # dest = t8 = array + idx + i
-    sll     $t5, $t6, 2             # t5 = i2 << 2 = i2 * 4
-    add     $t5, $t8, $t3           # src = t5 = &(children + t5)
-    # lw      $t5, ($t5)              # t5 = children[i]
-    # sw      $t5, ($t8)              # *t8 = t5 
+    add     $t8, $t4, $t8           # dst + i = t8 = array + idx + i
+
+    sll     $t5, $t0, 2             # t5 = i << 2 = i * 4
+    add     $t5, $t5, $t3           # t5 = &(children + t5)
+    lw      $t5, ($t5)              # t5 = children[i]
+    sll     $t4, $t6, 2             # t4 = i2 << 2 = i2 * 4
+    add     $t5, $t4, $t5           # src = t5 = &(children[i] + t4)
+    lw      $t5, ($t5)              # t5 = children[i][i2]
+    sw      $t5, ($t8)              # *t8 = t5 
     add     $t6, $t6, 1
 
 copy_array_test:
-    sll     $t5, $t6, 2             # t5 = i2 << 2 = i2 * 4
+    sll     $t5, $t0, 2             # t5 = i << 2 = i * 4
     add     $t5, $t5, $t2           # t5 = &(children_len + t5)
     lw      $t5, ($t5)              # t5 = children_len[i]
     slt     $t5, $t6, $t5           # t8 = i < children_len[i]
     beq     $t5, 1, copy_array_body
     j       rest_rad_body
 
-
 rad_body:
     sll     $t4, $t0, 2             # t4 = i * 4
     add     $t4, $t2, $t4           # t4 = children_len + i
     lw      $t4, ($t4)              # t4 = children_len[i]
-    beq     $t4, $0, rest_rad_body
+    bne     $t4, $0, recurse_rad_sort
 
 copy_array_jump:
     move    $t6, $0
@@ -389,7 +421,7 @@ rad_test:
 radsort_exit:
     # ---------- Reset Stack Frame and Return ----------
     lw $ra, 28($sp)
-    addiu $sp, $sp, 60
+    addiu $sp, $sp, 100
     jr      $ra
 
 # ---------- Register Definitions ----------
@@ -491,9 +523,9 @@ arrcpy:
 
 print:
     li $v0, 1
-    lw $t3, ($t4)
+    # lw $t3, ($t5)
     # lw $a0, 0($t3)
-    move $a0, $t3
+    move $a0, $ra
     syscall
 
     li $v0, 4
