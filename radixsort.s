@@ -44,6 +44,7 @@ ENTER_ELEM: .asciiz "Enter next element: "
 ANS:        .asciiz "The sorted list is:\n"
 SPACE:      .asciiz " "
 EOL:        .asciiz "\n"
+HI:         .asciiz "hi"
 
 .text
 .globl main
@@ -104,9 +105,11 @@ read_loop_cond:
     # conventions!
 
     # TODO: Somehow do array > 0
+
+
     move $a0 $s0
     move $a1 $s1
-
+    beq  $s1, $0, read_loop_after
     # ---- Function call to find_exp() ----
     jal find_exp
 
@@ -117,7 +120,7 @@ read_loop_cond:
     # calling radsort (radixsort)
     jal radsort
 
-
+read_loop_after:
     #---- Print sorted array -----------------------------------
     li      $v0, 4              # print_string
     la      $a0, ANS            # "The sorted list is:\n"
@@ -171,6 +174,12 @@ radsort:
     seq $t1 $a2 $0 # t1 = condition: exp == 0
     or $t1 $t0 $t1 # t1 = n < 2 || exp == 0
 
+    # sw          $a0,  68($sp)
+    # move        $t9, $ra
+    # jal         print
+    # move        $ra, $t9
+    # lw          $a0, 68($sp)
+
     bne $t1 $0 radsort_exit
 
     # ---------- Recursive Case ----------
@@ -210,6 +219,7 @@ radsort:
     move    $t5, $v0            # the addr of allocated memory
     sw      $t5, 20($sp)
     
+
     # TODO: --- Init Buckets Loop ---
     # t0 is loop variable
     # t1 is i * 2
@@ -274,7 +284,7 @@ bucket_assign_body:
     lw      $t4, 0($t4)             # $t4 = arr[i]
     lw      $t3, 8($sp)             # t3 = exp
     divu    $t4, $t3                # t1 = arr[i] / exp
-    mflo    $t4                     # t4 is reminder
+    mflo    $t4                     # t4 is quotient
     lw      $t5, 24($sp)            # t5 = RADIX
     divu    $t4, $t5                # t1 / RADIX
     mfhi    $t4                     # t4 is reminder, t4 is sort_index
@@ -335,10 +345,24 @@ recurse_rad_sort:
     lw      $t4, ($t4)              # t4 = children_len[i]
     move    $a1, $t4                # arg 1 = children_len[i]
     lw      $t4, 8($sp)             # t4 = exp
+
+    # sw          $a0,  68($sp)
+    # move        $t9, $ra
+    # jal print
+    # move        $ra, $t9
+    # lw          $a0, 68($sp)
+
     lw      $t5, 24($sp)            # t5 = RADIX
     divu    $t4, $t5                # t1 = exp / RADIX
-    mfhi    $t4                     # t4 is quotient
+    mflo    $t4                     # t4 is quotient
     move    $a2, $t4                # arg 2 = exp/RAD
+
+    # sw          $a0,  68($sp)
+    # move        $t9, $ra
+    # jal         print
+    # move        $ra, $t9
+    # lw          $a0, 68($sp)
+
     sw   $t0, 32($sp)
     sw   $t1, 36($sp)
     sw   $t2, 40($sp)
@@ -362,7 +386,8 @@ recurse_rad_sort:
 
 copy_array_body:    
     sll     $t8, $t6, 2             # t8 = i2 << 2 = i2 * 4
-    add     $t4, $t7, $t1           # dst = array + idx
+    sll     $t5, $t1, 2             # t5 = idx << 2 = i * 4
+    add     $t4, $t7, $t5           # dst = array + idx
     add     $t8, $t4, $t8           # dst + i = t8 = array + idx + i
 
     sll     $t5, $t0, 2             # t5 = i << 2 = i * 4
@@ -378,7 +403,7 @@ copy_array_test:
     sll     $t5, $t0, 2             # t5 = i << 2 = i * 4
     add     $t5, $t5, $t2           # t5 = &(children_len + t5)
     lw      $t5, ($t5)              # t5 = children_len[i]
-    slt     $t5, $t6, $t5           # t8 = i < children_len[i]
+    slt     $t5, $t6, $t5           # t8 = i2 < children_len[i]
     beq     $t5, 1, copy_array_body
     j       rest_rad_body
 
@@ -405,17 +430,6 @@ rad_test:
     slt     $t4, $t0, $t4           # t8 = i < RADIX
     beq     $t4, 1, rad_body
  
-
-
-    # TODO: --- Free Children Array Loop ---
-
-    # TODO: Free Children
-
-    # TODO: Free Children Len
-
-    # move $t0, $ra
-    # jal print
-    # move $ra, $t0
 
 
 radsort_exit:
@@ -523,10 +537,14 @@ arrcpy:
 
 print:
     li $v0, 1
-    # lw $t3, ($t5)
-    # lw $a0, 0($t3)
-    move $a0, $ra
+    # #lw $t3, ($t5)
+    # # lw $a0, 0($t3)
+    move $a0, $t4
     syscall
+
+    # li $v0, 4
+    # la $a0, HI
+    # syscall
 
     li $v0, 4
     la $a0, EOL
